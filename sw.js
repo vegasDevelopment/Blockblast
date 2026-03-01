@@ -1,46 +1,75 @@
-const CACHE_NAME = 'blockblast3d-v1';
+const CACHE_NAME = 'blockblast3d-v2';
 const ASSETS = [
-  './',
-  './index.html',
+  '/',
+  '/index.html',
   'https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;700&display=swap'
 ];
 
-// Kurulum: tüm dosyaları cache'e al
+// Install: cache assets
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(ASSETS);
-    })
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(ASSETS))
+      .then(() => self.skipWaiting())
   );
-  self.skipWaiting();
 });
 
-// Aktivasyon: eski cache'leri temizle
+// Activate: clean old caches
 self.addEventListener('activate', e => {
   e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    )
+    caches.keys()
+      .then(keys => Promise.all(
+        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+      ))
+      .then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-// Fetch: önce cache'e bak, yoksa ağdan al
+// Fetch: network first, fallback to cache
 self.addEventListener('fetch', e => {
-  e.respondWith(
-    caches.match(e.request).then(cached => {
-      if (cached) return cached;
-      return fetch(e.request).then(response => {
-        // Başarılı yanıtı cache'e kaydet
-        if (response && response.status === 200) {
+  // Skip non-GET requests
+  if (e.request.method !== 'GET') return;
+
+  // HTML dosyaları için network-first stratejisi
+  if (e.request.mode === 'navigate') {
+    e.respondWith(
+      fetch(e.request)
+        .then(response => {
+          // Başarılı yanıtı cache'e ekle
           const clone = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
-        }
-        return response;
-      }).catch(() => {
-        // Ağ yoksa ve cache'de de yoksa boş yanıt
-        return new Response('Offline', { status: 503 });
-      });
-    })
+          return response;
+        })
+        .catch(() => caches.match('/index.html'))
+    );
+    return;
+  }
+
+  // Diğer dosyalar için cache-first stratejisi
+  e.respondWith(
+    caches.match(e.request)
+      .then(cached => {
+        if (cached) return cached;
+        
+        return fetch(e.request)
+          .then(response => {
+            // Sadece başarılı yanıtları cache'e ekle
+            if (response && response.status === 200) {
+              const clone = response.clone();
+              caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
+            }
+            return response;
+          })
+          .catch(() => {
+            // CSS/JS dosyaları için boş yanıt
+            if (e.request.url.includes('.css')) {
+              return new Response('', { status: 200, statusText: 'OK' });
+            }
+            if (e.request.url.includes('.js')) {
+              return new Response('', { status: 200, statusText: 'OK' });
+            }
+            return new Response('Offline', { status: 503 });
+          });
+      })
   );
 });
