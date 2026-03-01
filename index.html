@@ -1534,5 +1534,17 @@ updateTaskTimer();
 buildStars();buildPreview();
 // Login screen açık, menu gizli — ekstra bir şey yapmaya gerek yok
 </script>
+
+<!-- SERVICE WORKER KAYDI -->
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(reg => console.log('✅ Service Worker kayıtlı:', reg.scope))
+      .catch(err => console.log('❌ Service Worker hatası:', err));
+  });
+}
+</script>
+  
 </body>
 </html>
