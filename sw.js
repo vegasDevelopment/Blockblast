@@ -1,4 +1,4 @@
-const CACHE_NAME = 'blockblast3d-v2';
+const CACHE_NAME = 'blockblast-game';
 const ASSETS = [
   '/',
   '/index.html',
